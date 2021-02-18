@@ -1,24 +1,35 @@
-window.addEventListener('load', () => {
-    const c = document.getElementById("canvas");
-    const ctx = c.getContext("2d");
-    ctx.beginPath();
-    ctx.arc(225, 110, 95, 0*Math.PI,2*Math.PI);
+function drawTimeCanvas(ctx, progress) {
+    ctx.clearRect(100,0,300,300);
 
+    ctx.beginPath();
+    ctx.arc(225, 110, 95, 0 * Math.PI, 2 * Math.PI);
     const grd = ctx.createRadialGradient(225, 110, 95, 90, 60, 100);
     grd.addColorStop(0, "rgba(0, 255, 0, 0.5)");
     grd.addColorStop(1, "rgba(225, 228, 30, 0.5)");
     ctx.fillStyle = grd;
     ctx.fill();
 
+    ctx.beginPath();
+    ctx.arc(225, 110, 95, 1.5 * Math.PI, progress * Math.PI, true); /* progress range(-0.5(full);1.5(empty)) */
     ctx.lineWidth = 7;
-    ctx.strokeStyle = "green";
-    ctx.stroke()
+    const ratio = (progress + 0.5) / 2;
+    const red = ratio * 255;
+    const green = (1 - ratio) * 255;
+    ctx.strokeStyle = `rgb(${red}, ${green}, 0)`;
+    ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(225, 110, 100, 0*Math.PI,2*Math.PI);
+    ctx.arc(225, 110, 100, 0 * Math.PI, 2 * Math.PI);
     ctx.lineWidth = 3;
     ctx.strokeStyle = "black";
-    ctx.stroke()
+    ctx.stroke();
+}
+
+window.addEventListener('load', () => {
+    const c = document.getElementById("canvas");
+    const ctx = c.getContext("2d");
+
+    drawTimeCanvas(ctx, -0.5);
 
     const playButton = document.getElementById("play-pause");
     playButton.style.background = "url(./assets/play.png) no-repeat";
@@ -36,15 +47,16 @@ window.addEventListener('load', () => {
         seconds: duration[4]
     }
 
-    new Timer(timeValues, playButton, stopButton);
+    new Timer(timeValues, playButton, stopButton, ctx);
 });
 
 class Timer {
-    constructor(durationInput, playButton, stopButton) {
+    constructor(durationInput, playButton, stopButton, ctx) {
         this.durationInput = durationInput;
         this.playButton = playButton;
         this.stopButton = stopButton;
         this.running = false;
+        this.ctx = ctx;
 
         this.onDurationChange = this.onDurationChange.bind(this);
         this.start = this.start.bind(this);
@@ -81,18 +93,20 @@ class Timer {
         }
         // launches the timer
         this.duration = this.timeToTimeStamp(this.durationInput);
+        this.initialDuration = this.duration;
         this.playButton.removeEventListener('click', this.start);
         this.playButton.addEventListener('click', this.play);
         this.play(true);
     }
 
     // starts or resumes the timer for the specified/remaining duration
-    play(start=false) {
+    play(start) {
         if(this.playButton.name == 'play') { /* start */
             this.playButton.style.background = "url(./assets/pause.png) no-repeat";
             this.playButton.name = 'pause';
             this.running = true;
-            if(start) this.marker = Date.now();
+            this.marker = Date.now();
+            start === true && (this.initialMarker = this.marker);
             this.tick();
         } else { /* pause */
             this.running = false;
@@ -116,6 +130,7 @@ class Timer {
         this.playButton.name = 'play';
         this.playButton.removeEventListener('click', this.play);
         this.playButton.addEventListener('click', this.start);
+        drawTimeCanvas(this.ctx, 1.5);
     }
 
     onDurationChange(e) {
@@ -145,6 +160,9 @@ class Timer {
         this.durationInput['hours'].innerText = hours > 9 ? hours : "0" + hours;
         this.durationInput['minutes'].innerText = minutes > 9 ? minutes : "0" + minutes;
         this.durationInput['seconds'].innerText = seconds > 9 ? seconds : "0" + seconds;
+
+        //redraw the time border canvas
+        drawTimeCanvas(this.ctx, (((this.initialDuration - duration) / this.initialDuration) * 2) - 0.5)
 
         // call tick recursively
         requestAnimationFrame(this.tick);
