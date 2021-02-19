@@ -44,7 +44,8 @@ window.addEventListener('load', () => {
     const timeValues = {
         hours: duration[0], 
         minutes: duration[2], 
-        seconds: duration[4]
+        seconds: duration[4],
+        ms: duration[6]
     }
 
     new Timer(timeValues, playButton, stopButton, ctx);
@@ -63,6 +64,7 @@ class Timer {
         this.play = this.play.bind(this);
         this.stop = this.stop.bind(this);
         this.tick = this.tick.bind(this);
+        this.displayTime = this.displayTime.bind(this);
 
         this.init();
     }
@@ -96,20 +98,21 @@ class Timer {
         this.initialDuration = this.duration;
         this.playButton.removeEventListener('click', this.start);
         this.playButton.addEventListener('click', this.play);
-        this.play(true);
+        this.play();
     }
 
     // starts or resumes the timer for the specified/remaining duration
-    play(start) {
-        if(this.playButton.name == 'play') { /* start */
+    play() {
+        if(this.playButton.name == 'play') { /* play */
             this.playButton.style.background = "url(./assets/pause.png) no-repeat";
             this.playButton.name = 'pause';
             this.running = true;
             this.marker = Date.now();
-            start === true && (this.initialMarker = this.marker);
+            this.timer = setInterval(() => this.stop(), this.duration);
             this.tick();
         } else { /* pause */
             this.running = false;
+            clearInterval(this.timer);
             this.duration = this.duration + this.marker - Date.now();
             this.playButton.style.background = "url(./assets/play.png) no-repeat";
             this.playButton.name = 'play';
@@ -117,20 +120,21 @@ class Timer {
     }
 
     stop() {
-        // also needs to resume edition of the duration
-        for (let element in this.durationInput) {
-            this.durationInput[element].style.contenteditable = "true";
-            this.durationInput[element].innerText = '00';
-        }
         // resets the timer
         this.running = false;
         this.duration = 0;
         this.marker = 0;
         this.playButton.style.background = "url(./assets/play.png) no-repeat";
         this.playButton.name = 'play';
+        clearInterval(this.timer);
+        drawTimeCanvas(this.ctx, 1.5);
+        // also needs to resume edition of the duration
+        for (let element in this.durationInput) {
+            this.durationInput[element].style.contenteditable = "true";
+            this.durationInput[element].innerText = '00';
+        }
         this.playButton.removeEventListener('click', this.play);
         this.playButton.addEventListener('click', this.start);
-        drawTimeCanvas(this.ctx, 1.5);
     }
 
     onDurationChange(e) {
@@ -147,19 +151,10 @@ class Timer {
     tick() {                       
         if(!this.running) return; 
         const duration = this.marker + this.duration - Date.now();
-
-        if(duration <= 0) {
-            this.stop();
-            alert('Time is over!');
-            return;
-        }
         
         // update the displayed times
-        const [hours, minutes, seconds] = this.timeStampToTime(duration);
-
-        this.durationInput['hours'].innerText = hours > 9 ? hours : "0" + hours;
-        this.durationInput['minutes'].innerText = minutes > 9 ? minutes : "0" + minutes;
-        this.durationInput['seconds'].innerText = seconds > 9 ? seconds : "0" + seconds;
+        const [hours, minutes, seconds, ms] = this.timeStampToTime(duration);
+        this.displayTime(hours, minutes, seconds, ms);
 
         //redraw the time border canvas
         drawTimeCanvas(this.ctx, (((this.initialDuration - duration) / this.initialDuration) * 2) - 0.5)
@@ -168,26 +163,36 @@ class Timer {
         requestAnimationFrame(this.tick);
     }
 
+    //displays time with dynamic time format
+    displayTime(hours, minutes, seconds, ms) {
+        this.durationInput['hours'].innerText = hours > 9 ? hours : "0" + hours;
+        this.durationInput['minutes'].innerText = minutes > 9 ? minutes : "0" + minutes;
+        this.durationInput['seconds'].innerText = seconds > 9 ? seconds : "0" + seconds;
+        this.durationInput['ms'].innerText = ms > 9 ? ms : "0" + ms;
+    }
+
     // converts input to timestamp
     timeToTimeStamp(durationInput) {
         const hours = parseInt(durationInput['hours'].innerText)*60*60*1000;
         const minutes = parseInt(durationInput['minutes'].innerText)*60*1000;
         const seconds = parseInt(durationInput['seconds'].innerText)*1000;
-        return hours + minutes + seconds;
+        const ms = parseInt(durationInput['ms'].innerText)*10;
+        return hours + minutes + seconds + ms;
     }
 
-    // converts duration to hh:mm:ss
+    // converts duration to hh:mm:ss:ms
     timeStampToTime(duration) {
         let remains;
 
         const hours = Math.floor(duration/60/60/1000);
-        remains = duration - hours * 60*60*1000;
+        remains = duration % (60 * 60 * 1000);
 
         const minutes = Math.floor(remains/60/1000);
-        remains = duration - minutes * 60*1000;
+        remains = remains % (60 * 1000);
 
         const seconds = Math.floor(remains/1000);
+        remains = Math.floor((remains % 1000)/10); /* to force 2 digits */
 
-        return [hours, minutes, seconds];
+        return [hours, minutes, seconds, remains];
     }
 }
