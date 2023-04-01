@@ -1,5 +1,5 @@
 function drawTimeCanvas(ctx, progress) {
-    ctx.clearRect(100,0,300,300);
+    ctx.clearRect(100, 0, 300, 300);
 
     ctx.beginPath();
     ctx.arc(225, 110, 95, 0 * Math.PI, 2 * Math.PI);
@@ -31,10 +31,10 @@ window.addEventListener('load', () => {
 
     drawTimeCanvas(ctx, -0.5);
 
-    const playButton = document.getElementById("play-pause");
-    playButton.style.background = "url(./assets/play.png) no-repeat";
-    playButton.style.backgroundSize = "cover";
-    playButton.name = 'play';
+    const playPauseButton = document.getElementById("play-pause");
+    playPauseButton.style.background = "url(./assets/play.png) no-repeat";
+    playPauseButton.style.backgroundSize = "cover";
+    playPauseButton.name = 'play';
 
     const stopButton = document.getElementById("stop");
     stopButton.style.background = "url(./assets/stop.png) no-repeat";
@@ -42,24 +42,23 @@ window.addEventListener('load', () => {
 
     const duration = document.querySelectorAll("#duration > p");
     const timeValues = {
-        hours: duration[0], 
-        minutes: duration[2], 
+        hours: duration[0],
+        minutes: duration[2],
         seconds: duration[4],
         ms: duration[6]
     }
 
-    new Timer(timeValues, playButton, stopButton, ctx);
+    new Timer(timeValues, playPauseButton, stopButton, ctx);
 });
 
 class Timer {
-    constructor(durationInput, playButton, stopButton, ctx) {
+    constructor(durationInput, playPauseButton, stopButton, ctx) {
         this.durationInput = durationInput;
-        this.playButton = playButton;
+        this.playPauseButton = playPauseButton;
         this.stopButton = stopButton;
         this.running = false;
         this.ctx = ctx;
 
-        this.onDurationChange = this.onDurationChange.bind(this);
         this.start = this.start.bind(this);
         this.play = this.play.bind(this);
         this.stop = this.stop.bind(this);
@@ -73,94 +72,80 @@ class Timer {
         for (let element in this.durationInput) {
             this.durationInput[element].addEventListener('input', e => this.onDurationChange(e));
         }
-        this.playButton.addEventListener('click', this.start);
-        this.stopButton.addEventListener('click', this.stop);
+        this.playPauseButton.addEventListener('click', this.start);
     }
 
-    // Launches the timer
-    start() {
-        // also needs to check for any numerical incoherence
+    onDurationChange(e) {
+        if (this.running) return;
+        // if numerical incoherence, print in red
+        if (!e.target.innerText.match(/^[0-9]{1,2}$/)) {
+            e.target.style.color = 'red';
+        } else {
+            e.target.style.color = 'inherit';
+        };
+    }
+
+    validation() {
         for (let element in this.durationInput) {
             const elem = this.durationInput[element];
-            if(elem.style.color == 'red') {
+            if (elem.style.color == 'red') {
                 alert('Please correct mistakes in duration.'); return;
             }
         }
-        if(Object.values(this.durationInput).every(value => value.innerText == '00')) {
-            alert('The minimal duration is 1 second.'); return;
+        if (Object.values(this.durationInput).every(value => value.innerText == '00')) {
+            alert('The minimal duration is 1 milisecond.'); return;
         }
-        // also needs to prevent edition of the duration
+    }
+
+    start() {
+        this.validation();
+        // prevents edition of the duration
         for (let element in this.durationInput) {
             this.durationInput[element].style.contenteditable = "false";
         }
         // launches the timer
-        this.duration = this.timeToTimeStamp(this.durationInput);
-        this.initialDuration = this.duration;
-        this.playButton.removeEventListener('click', this.start);
-        this.playButton.addEventListener('click', this.play);
+        this.timeLeft = this.timeToTimeStamp(this.durationInput);
+        this.initialDuration = this.timeLeft;
+        this.playPauseButton.removeEventListener('click', this.start);
+        this.playPauseButton.addEventListener('click', this.play);
+        this.stopButton.addEventListener('click', this.stop);
         this.play();
     }
 
-    // starts or resumes the timer for the specified/remaining duration
+    // starts or pauses the timer for the specified/remaining duration
     play() {
-        if(this.playButton.name == 'play') { /* play */
-            this.playButton.style.background = "url(./assets/pause.png) no-repeat";
-            this.playButton.name = 'pause';
+        if (this.playPauseButton.name == 'play') { /* play */
             this.running = true;
-            this.marker = Date.now();
-            this.timer = setInterval(() => this.stop(), this.duration);
+            this.playPauseButton.style.background = "url(./assets/pause.png) no-repeat";
+            this.playPauseButton.name = 'pause';
+            this.startTime = Date.now();
+            this.interval = setInterval(this.stop, this.timeLeft);
             this.tick();
         } else { /* pause */
             this.running = false;
-            clearInterval(this.timer);
-            this.duration = this.duration + this.marker - Date.now();
-            this.playButton.style.background = "url(./assets/play.png) no-repeat";
-            this.playButton.name = 'play';
+            this.playPauseButton.style.background = "url(./assets/play.png) no-repeat";
+            this.playPauseButton.name = 'play';
+            this.timeLeft += this.startTime - Date.now();
+            clearInterval(this.interval);
         }
     }
 
     stop() {
-        // resets the timer
         this.running = false;
-        this.duration = 0;
-        this.marker = 0;
-        this.playButton.style.background = "url(./assets/play.png) no-repeat";
-        this.playButton.name = 'play';
-        clearInterval(this.timer);
+        this.timeLeft = 0;
+        this.startTime = 0;
+        this.playPauseButton.style.background = "url(./assets/play.png) no-repeat";
+        this.playPauseButton.name = 'play';
+        clearInterval(this.interval);
         drawTimeCanvas(this.ctx, 1.5);
         // also needs to resume edition of the duration
         for (let element in this.durationInput) {
             this.durationInput[element].style.contenteditable = "true";
             this.durationInput[element].innerText = '00';
         }
-        this.playButton.removeEventListener('click', this.play);
-        this.playButton.addEventListener('click', this.start);
-    }
-
-    onDurationChange(e) {
-        if(this.running) return;
-        // if numerical incoherence, print in red
-        if(!e.target.innerText.match(/^[0-9]{2}$/)) {
-            e.target.style.color = 'red';
-        } else {
-            e.target.style.color = 'inherit';
-        }; 
-    }
-
-    // Use a RAF to update the timer and draw the circle
-    tick() {                       
-        if(!this.running) return; 
-        const duration = this.marker + this.duration - Date.now();
-        
-        // update the displayed times
-        const [hours, minutes, seconds, ms] = this.timeStampToTime(duration);
-        this.displayTime(hours, minutes, seconds, ms);
-
-        //redraw the time border canvas
-        drawTimeCanvas(this.ctx, (((this.initialDuration - duration) / this.initialDuration) * 2) - 0.5)
-
-        // call tick recursively
-        requestAnimationFrame(this.tick);
+        this.stopButton.removeEventListener('click', this.stop);
+        this.playPauseButton.removeEventListener('click', this.play);
+        this.playPauseButton.addEventListener('click', this.start);
     }
 
     //displays time with dynamic time format
@@ -173,10 +158,10 @@ class Timer {
 
     // converts input to timestamp
     timeToTimeStamp(durationInput) {
-        const hours = parseInt(durationInput['hours'].innerText)*60*60*1000;
-        const minutes = parseInt(durationInput['minutes'].innerText)*60*1000;
-        const seconds = parseInt(durationInput['seconds'].innerText)*1000;
-        const ms = parseInt(durationInput['ms'].innerText)*10;
+        const hours = parseInt(durationInput['hours'].innerText) * 60 * 60 * 1000;
+        const minutes = parseInt(durationInput['minutes'].innerText) * 60 * 1000;
+        const seconds = parseInt(durationInput['seconds'].innerText) * 1000;
+        const ms = parseInt(durationInput['ms'].innerText) * 10;
         return hours + minutes + seconds + ms;
     }
 
@@ -184,15 +169,32 @@ class Timer {
     timeStampToTime(duration) {
         let remains;
 
-        const hours = Math.floor(duration/60/60/1000);
+        const hours = Math.floor(duration / 60 / 60 / 1000);
         remains = duration % (60 * 60 * 1000);
 
-        const minutes = Math.floor(remains/60/1000);
+        const minutes = Math.floor(remains / 60 / 1000);
         remains = remains % (60 * 1000);
 
-        const seconds = Math.floor(remains/1000);
-        remains = Math.floor((remains % 1000)/10); /* to force 2 digits */
+        const seconds = Math.floor(remains / 1000);
+        remains = Math.floor((remains % 1000) / 10); /* to force 2 digits */
 
         return [hours, minutes, seconds, remains];
+    }
+
+    // Use a RAF to update the timer and draw the circle
+    tick() {
+        if (!this.running) return;
+
+        const timeLeft = this.startTime + this.timeLeft - Date.now();
+
+        // update the displayed times
+        const [hours, minutes, seconds, ms] = this.timeStampToTime(timeLeft);
+        this.displayTime(hours, minutes, seconds, ms);
+
+        //redraw the time border canvas
+        drawTimeCanvas(this.ctx, (((this.initialDuration - timeLeft) / this.initialDuration) * 2) - 0.5)
+
+        // call tick recursively
+        requestAnimationFrame(this.tick);
     }
 }
